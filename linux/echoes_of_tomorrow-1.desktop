@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Echoes of Tomorrow
+Comment=A visual novel about time, choice, and the signals we send to ourselves
+Exec=echoes_of_tomorrow
+Icon=echoes_of_tomorrow-1
+Terminal=false
+Categories=Game;
+StartupNotify=true
+StartupWMClass=echoes_of_tomorrow-1
+
