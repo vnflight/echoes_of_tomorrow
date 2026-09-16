@@ -197,13 +197,10 @@ image marcus defeated = "images/marcus defeated.png"
 ## Explicit declarations — Ren'Py auto-detection is unreliable for underscore
 ## filenames across versions.
 image bg_boot_screen = "images/bg_boot_screen.png"
-image bg_cascade = "images/bg_cascade.png"
 image bg_comms = "images/bg_comms.png"
-image bg_conference_hall = "images/bg_conference_hall.png"
 image bg_dawn = "images/bg_dawn.png"
 image bg_generator = "images/bg_generator.png"
 image bg_habitat_module = "images/bg_habitat_module.png"
-image bg_holding_facility = "images/bg_holding_facility.png"
 image bg_lab = "images/bg_lab.png"
 image bg_observatory = "images/bg_observatory.png"
 image bg_observatory_aurora = "images/bg_observatory_aurora.png"
