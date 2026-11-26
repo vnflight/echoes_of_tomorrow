@@ -1,6 +1,5 @@
 ## Echoes of Tomorrow — adaptive music engine.
 ##
-## Direction: ../MUSIC_DIRECTION.md (placement §5, Sol's guardrails §7).
 ## One parameterized engine (per the v13 brief: generalize, don't clone the
 ## Mystic Café per-cue modules). Everything here is PRESENTATION ONLY — it
 ## reads story state, never writes it, so the story graph is untouched.

@@ -7,7 +7,7 @@
 ## --- One-time presentation reset (2026-08-18) ---
 ## Dev-era agent sessions ran this sample game in turbo and could die
 ## holding preferences.transitions at 0 — the shim now stash-protects its
-## own mutations (vnflight c6030ee + the 789bc17 ownership fix), but
+## own mutations, but
 ## persistents damaged BEFORE that carry plain zeros with no provenance,
 ## and the shim rightly refuses value-based guessing (values are not
 ## proof of who wrote them). The GAME may assert its own presentation
@@ -126,7 +126,7 @@ default specialization = "signals"          # "signals", "physics", or "computin
 default audit_focus = "trust"              # "trust", "temporal", "chen", or "aria_code"
 
 ## --- ARIA core source audit: BACKGROUND WORK (2026-08-17) ---
-## design/DESIGN_echoes_process_log.md §2. A machine's work backgrounds;
+## A machine's work backgrounds;
 ## Elara's attention does not. The audit used to be a 30/45-minute FOREGROUND
 ## sink that decided a whole run by itself (live-observed). It is now ~10
 ## minutes of her hands to frame the query and then ARIA's own cycles, accruing
@@ -309,7 +309,7 @@ default marcus_lab_present = False          # Transient: Marcus at the lab side 
 default _audit_marcus_was_present = False   # Shared room/terminal observation; restored with the scene on load
 default marcus_lab_talked = False           # Talked to Marcus at the lab console (seeds the '45 disclosure breadcrumb)
 default marcus_caught_live = False          # He watched Elara investigate him at the lab console (early marcus_knows_access)
-default marcus_catch_topic = None           # R5-5: WHAT he caught her reading ("chen"/"aria_code"/"liaison") — confrontation reads it
+default marcus_catch_topic = None           # WHAT he caught her reading ("chen"/"aria_code"/"liaison") — confrontation reads it
 default marcus_corridor_seen = False        # One-shot phase-2 comms-corridor encounter
 default marcus_eva_came_to_elara = False    # Transient: Marcus sought her out from the hub rather than waiting at Comms
 default marcus_eva_deferred_at = None       # Time remaining when Elara postponed the rope-line decision; a later Comms return can reopen it
@@ -334,8 +334,8 @@ default marcus_found_corridor = False       # She has already found him at the c
 default marcus_found_terminal = False       # She has already found him at the lab side console
 default two_person_repair_done = False      # The whiteout antenna setpiece happened
 default marcus_disclosure_hint = False      # Marcus obliquely mentioned the '45 disclosure (gates the liaison thread)
-default stay_whisper_seen = False           # One-shot ECHO-7 "IT SOUNDS LIKE AFTER" whisper (label echo_whisper). Re-homed from the removed corridor stay in round 4: THREE doors, one flag — a telescope stay (any spec), comms-room arrival (any spec), or any other room's stay for a signals specialist
-default echo7_asked_ever = []               # R5-4: questions asked across ALL comms visits (kills re-ask farming; reassign, never .append)
+default stay_whisper_seen = False           # One-shot ECHO-7 "IT SOUNDS LIKE AFTER" whisper (label echo_whisper). Re-homed from the removed corridor stay: THREE doors, one flag — a telescope stay (any spec), comms-room arrival (any spec), or any other room's stay for a signals specialist
+default echo7_asked_ever = []               # Questions asked across ALL comms visits (kills re-ask farming; reassign, never .append)
 
 ## --- Act 3 interlude (bible 16b) ---
 default source_stance = None                # "empathetic" / "independent" / "verify" — what ECHO-7's identity changes for Elara
@@ -356,11 +356,11 @@ default storm_lights_event_seen = False
 default storm_frost_event_seen = False
 default antenna_damage_notice = False       # Transient: damage flipped in spend_storm_time, not yet announced at the hub
 default telescope_damage_notice_seen = False
-default antenna_damage_signal = 0           # Signal value AT damage time — the announcement quotes this, not the live value (a repair can land between tick and announcement; F3 ariafirst)
-default aria_recovered_from_collapse = False # ARIA hit <=20 in the night; act3_start rebuilt her to the 20% floor (SHOWN) and act-3 scenes carry low-coherence texture + the cold-restart offhand, graded better with distance from the storm (F4 scanwear + user design)
+default antenna_damage_signal = 0           # Signal value AT damage time — the announcement quotes this, not the live value (a repair can land between tick and announcement)
+default aria_recovered_from_collapse = False # ARIA hit <=20 in the night; act3_start rebuilt her to the 20% floor (SHOWN) and act-3 scenes carry low-coherence texture + the cold-restart offhand, graded better with distance from the storm
 
-## --- Stealth scan assists (F4 user design 2026-08-19, split + spec-tuned
-## 2026-08-19 round 2) ---
+## --- Stealth scan assists (2026-08-19, split + spec-tuned
+## 2026-08-19) ---
 ## TWO separate un-alerting lab actions, BOTH gated on aria_motive_asked
 ## (the "Investigate ARIA's unsanctioned scan" beat — we know she does
 ## something AND what) in addition to the scan actually running.
@@ -445,7 +445,7 @@ init python:
     def eot_sweep_credit(t_start, t_end):
         # Clean-minute credit for the integration running from clock t_start
         # down to t_end (t_start > t_end), split across storm-phase rate
-        # boundaries (Sol review #2): full speed above t=150, half through
+        # boundaries: full speed above t=150, half through
         # the storm phase (150 >= t > 60), a third in the blizzard (t <= 60).
         # Returns a FLOAT: repeated int truncation at the storm-3 third-rate
         # melted small ticks to zero (live run finding). Display sites render
@@ -458,7 +458,7 @@ init python:
         return credit
 
     def eot_cold_taxed(minutes, aux_minutes=None):
-        # The cold tax, as ONE shared arithmetic (Sol economy review 2, #1):
+        # The cold tax, as ONE shared arithmetic:
         # spend_storm_time inflates every action's minutes by storm/heating
         # state, so any check of the form "is there enough night left for an
         # N-minute task" must compare against the TAXED cost, not the nominal
@@ -589,8 +589,8 @@ init python:
     def eot_rate_at(integ):
         # The rate-tier table, addressable at ANY integrity value — the
         # credit integrator must rate a segment at the segment's own
-        # integrity, never at the live store's end-of-tick value (Sol
-        # economy review 5 fallout: the flat-segment branch was quietly
+        # integrity, never at the live store's end-of-tick value (a
+        # flat-segment branch was once quietly
         # reading the store).
         if integ > 75:
             return 1.0
@@ -603,8 +603,8 @@ init python:
         return 0.0
 
     def eot_coherence_credit(integ_start, integ_end, minutes):
-        # Scan credit integrated across integrity-TIER crossings (Sol economy
-        # review 3, #1): rating a whole tick at its end-of-tick tier made
+        # Scan credit integrated across integrity-TIER crossings:
+        # rating a whole tick at its end-of-tick tier made
         # progress depend on menu cadence — one long blizzard action earned
         # nothing for the minutes ARIA was still functional. Model: integrity
         # moves linearly from integ_start to integ_end over `minutes`; credit
@@ -676,7 +676,7 @@ init python:
         return result
 
     def eot_scan_credit_tick(integ_start, integ_end, t_start, t_end, frost_fired):
-        # Tick-level scan credit (Sol economy reviews 4-5, #1): continuous
+        # Tick-level scan credit: continuous
         # integrity movement is PIECEWISE-linear inside a tick — the cold
         # drain switches on at t=150 and jumps 10/hr -> 36/hr at t=60 — so
         # the credit walks the shared environmental segments. The discrete
@@ -761,8 +761,8 @@ init python:
         next_debt = max(0.0, (cost - points) * target)
         return gain, next_debt, points
 
-    ## --- The STATION PROCESSES readout (design/DESIGN_echoes_process_log.md
-    ## §1, 2026-08-17) -----------------------------------------------------
+    ## --- The STATION PROCESSES readout (2026-08-17)
+    ## -----------------------------------------------------
     ## Live grounding: the origin sweep already accrued in the background and
     ## was praised for it — and was ALSO once reported as "never delivered",
     ## because nothing on the station ever showed it running. Visibility is
@@ -785,7 +785,7 @@ init python:
     def eot_aria_rate_label(integ):
         # ARIA's work rate, in one word, for the panel's right-hand side.
         # LOCKSTEP with eot_rate_at (above): same four boundaries, same
-        # meanings — pinned in tests/test_sweep_boundaries.py. The lab
+        # meanings. The lab
         # console's own scan-status row keeps its lowercase sentence diction;
         # this is the terminal-strip register.
         if integ > 75:
@@ -1004,7 +1004,7 @@ init python:
         if (getattr(s, "generator_repaired", False)
                 and not getattr(s, "two_person_repair_done", False)):
             pts += 1
-        # F4 stealth boost: repeated quiet cycle-lending leaves a readable
+        # Stealth boost: repeated quiet cycle-lending leaves a readable
         # shape in the thermal ledger (delayed on the first past-allowance
         # use, immediate one later; a systems engineer's allowance is 3, not
         # 1) — unsigned help within the allowance is deniable.
@@ -1014,7 +1014,7 @@ init python:
         # Marcus physically in the lab watching her re-phase the search.
         if getattr(s, "scan_damp_seen_by_marcus", False):
             pts += 1
-        # Codex #4: the array-tuning favor is only suspicious on the route
+        # The array-tuning favor is only suspicious on the route
         # where he knew about the signal and it never went up the chain —
         # matching the climax's own gating. An innocent favor is not evidence.
         if (getattr(s, "marcus_tuned_array", False)

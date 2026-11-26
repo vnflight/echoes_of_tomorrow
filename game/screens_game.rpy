@@ -905,7 +905,7 @@ screen observatory_map():
         else:
             text "Select station section" xalign 0.5 yalign 0.91 size 13 color "#5d859d"
 
-        ## Corridor waiting removed (cost-legibility round 3): waiting belongs
+        ## Corridor waiting removed (cost legibility): waiting belongs
         ## in the rooms. act2_hub still guards Return("stay") at zero cost —
         ## an auto-advance mis-dismiss of this screen can synthesize it.
 
@@ -1544,7 +1544,7 @@ screen observatory_hud():
 ## Reviews evidence_log collected throughout the game.
 ## Pattern: modal overlay, stale choice suppression when opened mid-menu.
 ##
-## STATION PROCESSES (2026-08-17, design/DESIGN_echoes_process_log.md §1) rides
+## STATION PROCESSES (2026-08-17) rides
 ## the TOP of this panel. The LOG is already the night's ledger and it is
 ## already a registered overlay, so the readout needs no button, no screen tag
 ## and no plumbing of its own — the passive-overlay text channel carries its
@@ -1786,7 +1786,7 @@ screen endcredits():
 ## Blocks that switch away from "log" set it back at the end (usually right
 ## after `nvl clear`), so anything unvisited keeps the default.
 ##
-## Chrome plates come from diagnostics/render_echoes_ui.py.
+## Chrome plates are pre-rendered images made by a separate UI render script.
 ################################################################################
 
 default nvl_frame = "log"

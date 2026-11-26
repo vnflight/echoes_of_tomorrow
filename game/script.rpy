@@ -66,6 +66,19 @@ define echo_room_beat = Pause(0.35)
 define echo_exterior_hold = Pause(3.0)
 
 init python:
+    def eot_menu_arguments(*args, **kwargs):
+        """Per-menu disabled rows: `menu (include_disabled=True):`.
+
+        Ren'Py reads config.menu_include_disabled while building each menu and
+        has no per-menu switch. Setting it here, on every menu, means a menu
+        that does not ask gets the default, also after a load or rollback lands
+        past the menu that asked.
+        """
+        config.menu_include_disabled = bool(kwargs.pop("include_disabled", False))
+        return args, kwargs
+
+    config.menu_arguments_callback = eot_menu_arguments
+
     def eot_ending_title_hold(subtitle=None):
         """Click-skippable reading time for the final title composition."""
         if not subtitle:
@@ -1169,7 +1182,7 @@ label act2_start:
             marcus "Seven months, give or take. And that's the fast track."
             elara "Seven months."
             marcus "Renewals have a calendar. Repairs just have a queue. The antenna manifest is still sitting where I left it."
-            ## F2 wave (2026-08-19, coldread): Marcus's old "better off if it
+            ## 2026-08-19: Marcus's old "better off if it
             ## just... wasn't there" line telegraphed him as the suspect one
             ## scene after ECHO-7 points at "someone you trust." The beat's
             ## real payload runs the OTHER way (canteen_slip_seen = ELARA's
@@ -1475,10 +1488,10 @@ label spend_storm_time:
     ## line is emitted from act2_hub (NVL context here is unreliable).
     ## KEEP IN LOCKSTEP with eot_cold_taxed (game_variables.rpy): the
     ## recovery floor/success checks use that helper for this exact
-    ## arithmetic (Sol economy review 2, #1). The inline form stays here
+    ## arithmetic. The inline form stays here
     ## because flattener scenarios stub functions as per-scenario constants,
     ## which cannot express a tick-varying tax. Pinned against the helper in
-    ## tests/test_sweep_boundaries.py.
+    ## the boundary tests.
     if storm_intensity >= 3:
         if power_priority != "heating" and not _aux_warm:
             $ _storm_minutes_spent = int(int(_storm_minutes_spent) * 1.40)
@@ -1492,10 +1505,10 @@ label spend_storm_time:
     $ _prev_time = time_remaining
     ## Tick-start integrity, captured before ANY of this tick's integrity
     ## mutations (drift, frost, cold drain) — the scan credit integrates
-    ## across the tick's whole decline (Sol economy review 3, #1).
+    ## across the tick's whole decline.
     $ _integ_at_tick_start = aria_integrity
     $ _cold_debt_at_tick_start = aria_cold_debt
-    ## Sol round-4: partial boundary credit is only honest if the link was
+    ## Partial boundary credit is only honest if the link was
     ## valid when the tick BEGAN (pre-tick costs like the question's -4 have
     ## already landed by now; storm/antenna state is still the tick-start
     ## state here). A tick that started on a bad link earns nothing, no
@@ -1520,10 +1533,10 @@ label spend_storm_time:
     $ _frost_this_tick = storm_intensity >= 2 and not storm_frost_event_seen
 
     ## B4 per-tick power-priority drift, pro-rated to the tick's ACTUAL
-    ## elapsed span (Sol economy review 2, #2: the clock clamps at zero, so
+    ## elapsed span (the clock clamps at zero, so
     ## minutes past the clamp are phantom time no continuous effect may use).
-    ## Rate 3 per full 60 min, with PER-SUBSYSTEM fixed-point carry (Sol
-    ## economy review 5, #2): signal drift is a SIGNED account (comms +,
+    ## Rate 3 per full 60 min, with PER-SUBSYSTEM fixed-point carry:
+    ## signal drift is a SIGNED account (comms +,
     ## telescope −, equal time nets to zero); ARIA recovery keeps its own —
     ## residue must never transfer meaning between unrelated systems.
     ## heating/balanced neither accrue nor pay.
@@ -1541,7 +1554,7 @@ label spend_storm_time:
         $ _aria_before_drift = aria_integrity
         $ aria_integrity = min(100, aria_integrity + _drift)
         $ _aria_recovery_lost += max(0, _aria_before_drift + _drift - 100)
-        ## History for the On-Faith counted-cost lines (Sol review 2, #5):
+        ## History for the On-Faith counted-cost lines:
         ## she DID power ARIA at some point — the ending must not claim she
         ## never paid a watt.
         $ aria_ever_powered = True
@@ -1562,7 +1575,7 @@ label spend_storm_time:
         $ antenna_reroute_debt -= _reroute_strain * 20
         $ signal_strength = max(0, signal_strength - _reroute_strain)
 
-    ## Storm damage state flips HERE, where time actually passes (review #1:
+    ## Storm damage state flips HERE, where time actually passes (
     ## the sweep must never bank "clean" minutes through a dead antenna, and
     ## the map must not show an intact array after t=200). The hub only
     ## ANNOUNCES these, via the notice flags — same pattern as the sweep.
@@ -1570,7 +1583,7 @@ label spend_storm_time:
     if _damage_this_tick:
         $ antenna_damaged = True
         $ signal_strength = max(0, signal_strength - 30)
-        ## F3 wave (ariafirst): the hub announcement interpolates
+        ## The hub announcement interpolates
         ## signal_strength at ANNOUNCE time — a repair landed between damage
         ## and announcement once and the alert read "degraded to 100%".
         ## Capture the post-drop value here, where the damage is real.
@@ -1631,7 +1644,7 @@ label spend_storm_time:
             $ _cold_num = _cold_num // 2
         elif _aux_covered > 0:
             $ _cold_num = (_cold_num * (2 * _aux_elapsed - _aux_covered)) // (2 * _aux_elapsed)
-        ## Sol economy review #1: fixed-point carry. Per-tick int() rounding
+        ## Fixed-point carry. Per-tick int() rounding
         ## let a run of short actions dodge most of the "continuous" drain
         ## (5 min at intensity 2 -> int(50/60) == 0, every time). Debt accrues
         ## in rate-minutes; whole points drain as they accumulate; the
@@ -1641,7 +1654,7 @@ label spend_storm_time:
         $ aria_cold_debt -= _cold_pts * 60
         ## What the drain ACTUALLY took, not what it asked for: at the floor
         ## the clamp eats the difference, and the attribution line must not
-        ## bill her for points she no longer had to lose (cost round 6).
+        ## bill her for points she no longer had to lose.
         $ _cold_applied = min(_cold_pts, aria_integrity)
         $ aria_integrity = max(0, aria_integrity - _cold_pts)
         ## Attribution mirror (live-run item): a long action's continuous
@@ -1661,7 +1674,7 @@ label spend_storm_time:
     ## Apply the wear before crediting progress so eot_scan_credit_tick sees
     ## the same endpoint the player sees on the status panel.
     if coherence_scan_running and not coherence_found:
-        ## Stealth DAMP (user design round 2): re-phasing the search reduces
+        ## Stealth DAMP (user design): re-phasing the search reduces
         ## its wear while the window holds (scan_damp_until is a
         ## time_remaining threshold; the clock counts down toward it).
         ## Split a tick at that threshold: a long action which crosses expiry
@@ -1680,7 +1693,7 @@ label spend_storm_time:
         $ coherence_scan_wear_debt -= _scan_wear_pts * 20
         $ aria_integrity = max(0, aria_integrity - _scan_wear_pts)
 
-    ## F4 stealth boost, the delayed trace: warmth accrued in the thermal
+    ## Stealth boost, the delayed trace: warmth accrued in the thermal
     ## ledger surfaces after a while — the first past-allowance quiet assist
     ## becomes a Marcus-readable trace when this timer drains (immediate one
     ## use later).
@@ -1698,18 +1711,18 @@ label spend_storm_time:
     ## display site renders int(coherence_scan_progress).
     ## Elapsed span, not the (possibly clamped-past-zero) inflated spend —
     ## phantom minutes were quietly flipping intended collapse routes into
-    ## found routes around the 150 threshold (Sol economy review 2, #2).
+    ## found routes around the 150 threshold.
     ## Credit integrates piecewise: across integrity-tier crossings, across
     ## the drain-window boundaries (onset at t=150, the 10->36/hr jump at
-    ## t=60), with the discrete frost step at its t=150 moment (Sol economy
-    ## reviews 3-5, #1). Cadence-independent up to integer-carry payout
-    ## stepping — a bounded artifact, pinned in test_sweep_boundaries.py,
+    ## t=60), with the discrete frost step at its t=150 moment.
+    ## Cadence-independent up to integer-carry payout
+    ## stepping — a bounded artifact, pinned in the boundary tests,
     ## not an absolute guarantee.
     if coherence_scan_running and not coherence_found:
         $ coherence_scan_progress += eot_scan_credit_tick(_integ_at_tick_start, aria_integrity, _prev_time, time_remaining, _frost_this_tick)
 
     ## ARIA's COMMISSIONED work — the core source audit (2026-08-17,
-    ## design/DESIGN_echoes_process_log.md §2). It is her cycles, so it accrues
+    ## see "The source audit" below). It is her cycles, so it accrues
     ## through the SAME credit function as her own coherence scan above: same
     ## rate tiers on integrity, same tick-level integration across the drain
     ## windows and the frost step. Two differences, both deliberate:
@@ -1752,16 +1765,16 @@ label spend_storm_time:
 
     ## Origin sweep (continuous process): accrues clean minutes while the
     ## array holds, slower as the storm worsens (full / half / third at storm
-    ## 0-1 / 2 / 3, phase-split within a tick — review #2; the blizzard also
+    ## 0-1 / 2 / 3, phase-split within a tick; the blizzard also
     ## demands signal >= 75). Losing reception suspends it, keeping progress;
     ## the notice surfaces at the next hub. A tick that crossed a failure
     ## boundary banks the clean part above it — and if that clean part
-    ## FINISHES the dataset, it is complete, not interrupted (review #1).
+    ## FINISHES the dataset, it is complete, not interrupted.
     ## A dataset at 45+ is done and awaiting announcement; nothing that
     ## happens afterward can take it away.
     if origin_sweep_running and origin_sweep_progress < 45:
         if not _sweep_ok_at_start:
-            ## Sol round-5/6: the link was bad when the tick began, so the
+            ## The link was bad when the tick began, so the
             ## process stopped right there — ARIA's contract is "if reception
             ## drops below threshold, it stops" — whatever drift did later.
             ## No phantom running-but-uncredited state; if reception has
@@ -1915,13 +1928,6 @@ label act2_station_checkpoint:
     ## first-arrival beat.
     if hub_return_location is None:
         $ hub_visits += 1
-    ## Disabled-choice visibility is armed per menu (2026-08-17, presentation
-    ## stage 2: the lab's spent "Talk to him." stays on the list with its
-    ## reason) and disarmed on every way out of that menu. This is the net,
-    ## because the flag is process-global and a load lands mid-night: every
-    ## room path comes back through the hub, so no leak can survive one
-    ## traversal and put a greyed twin under a variant menu elsewhere.
-    $ config.menu_include_disabled = False
     ## The first hub stop follows the canteen's ADV conversation. The map is a
     ## screen, not a dialogue statement, so it does not itself retire that say
     ## window; the translucent room log then exposed the old ADV line beneath
@@ -1976,7 +1982,7 @@ label act2_station_checkpoint:
                 nvl hide echo_mode_dissolve
             nvl clear
 
-    ## Coherence scan completion (Codex #2): resolved FIRST — before the
+    ## Coherence scan completion: resolved FIRST — before the
     ## time-zero climax jump and before Marcus's lock check — so a scan that
     ## crossed its target on the final action still counts as found, and cannot
     ## be locked or climax-skipped by this same checkpoint. Completion outranks
@@ -2017,10 +2023,10 @@ label act2_station_checkpoint:
         $ nvl_frame = "log"
 
     ## COMMISSIONED BACKGROUND WORK REPORTS HERE (2026-08-17,
-    ## design/DESIGN_echoes_process_log.md §2), beside the coherence scan and
+    ## see "The source audit" below), beside the coherence scan and
     ## the origin sweep — the hub is where the station tells her what finished
     ## while she was elsewhere. Resolved BEFORE the time-zero climax jump, for
-    ## the coherence scan's reason (Codex #2): work that finished is finished,
+    ## the coherence scan's reason: work that finished is finished,
     ## and a run that crossed its target on the final action must not be
     ## silently discarded. The audit's knowledge therefore always arrives with
     ## its announcement — there is no unseen-report state to invent, and
@@ -2064,7 +2070,7 @@ label act2_station_checkpoint:
         $ nvl_frame = "log"
 
     ## Economy pass: one-shot fairness surface for the cold drain — ARIA names
-    ## the decline and the lever (power priority). Sol economy review #2: this
+    ## the decline and the lever (power priority). This
     ## runs BEFORE the time-zero climax jump, so a final action that drags her
     ## across the line is still named to the player's face — with a too-late
     ## variant when there is no night left to act on the advice.
@@ -2093,7 +2099,7 @@ label act2_station_checkpoint:
         ## qualify (one integrity speech per hub stop) and deliberately does
         ## NOT clear the accumulator — those points stay owed an explanation.
         ##
-        ## WINDOW, HONESTLY (cost round 6, live-run item): the accumulator is
+        ## WINDOW, HONESTLY (live-run item): the accumulator is
         ## cleared when it is SPOKEN, not on every hub stop — a visit under the
         ## 8-point bar says nothing and carries, and the <= 35 notice above
         ## deliberately does not clear it either. So "since you last stood here"
@@ -2239,7 +2245,7 @@ label act2_station_checkpoint:
     ## condition kept on one line for the route flattener (no functions — all
     ## defaulted).
     ##
-    ## Cost legibility (round 3): this was the last fuzzy ARIA estimate over a
+    ## Cost legibility: this was the last fuzzy ARIA estimate over a
     ## 40-75 spread, and machines quote numbers. LOCKSTEP: the ladder below
     ## mirrors recovery_attempt's _rec_cost exactly — computing 45, signals 40
     ## (only while the line is open; blocked signals falls to the desperate
@@ -2276,7 +2282,7 @@ label act2_station_checkpoint:
         $ nvl_frame = "bulletin"
         nvl show echo_mode_dissolve
         narrator_nvl "Every speaker on the station clears its throat at once."
-        ## F3 wave (ariafirst): a repair can land between the damage tick and
+        ## A repair can land between the damage tick and
         ## this announcement (she was in the generator room when the threshold
         ## crossed). A full red alert for an already-fixed fault \u2014 with a
         ## live-interpolated "degraded to 100%" \u2014 read as a logic bug.
@@ -2517,8 +2523,8 @@ label act2_station_checkpoint:
     elif selected_location == "storage":
         jump hub_storage
     else:
-        ## Corridor stay REMOVED (2026-08-14, waiting-belongs-in-the-rooms,
-        ## round 2). The 60-minute listening wait was the last place to spend
+        ## Corridor stay REMOVED (2026-08-14, waiting-belongs-in-the-rooms).
+        ## The 60-minute listening wait was the last place to spend
         ## the night doing nothing; waiting now belongs exclusively to the
         ## rooms, at the work. Both the corridor-wait button and the
         ## "Go find Marcus" verb are gone from screens_game.rpy now, so this
@@ -2555,7 +2561,7 @@ label act2_checkpoint_storage:
     jump act2_station_checkpoint
 
 
-## --- Shared beats of waiting (2026-08-14, round 4) ---------------------------
+## --- Shared beats of waiting (2026-08-14) -----------------------------------
 ## Two one-shots that belong to WAITING rather than to any one room, migrated
 ## out of the removed corridor stay. They live here, once, because four wait
 ## sites cannot be kept in step by hand.
@@ -2647,7 +2653,7 @@ label echo_whisper:
 ## Their room menus feed these two arrival labels and one shared conversation.
 ##
 ## Ten minutes on a first arrival at that location, FIVE on a repeat (she knows
-## the way now), paid at the END of the visit: like the round-4 entry-cost
+## the way now), paid at the END of the visit: like the entry-cost
 ## rule, the arrival variant and every effect are read on the clock she walked
 ## in with, and the seal a cold telling triggers lands BEFORE spend_storm_time
 ## so those minutes cannot credit a scan he has just killed. Once every
@@ -2775,7 +2781,7 @@ label marcus_room_visit:
         ## as a flat lie. She is not empty-handed; she is holding nothing he
         ## could not argue with. No menu at all on this arm — "Leave him to it"
         ## on its own is not a decision, it is a button that costs ten minutes.
-        ## Wave finding (2026-08-16, freesonnet4): with a SEALED DRIVE in her
+        ## Play finding (2026-08-16): with a SEALED DRIVE in her
         ## pocket, "nothing sealed, nothing signed" read as a flat lie again —
         ## same failure, new inventory. And repeat visits gave no sign the
         ## night's disclosures were spent, so players kept paying the trip to
@@ -2790,7 +2796,7 @@ label marcus_room_visit:
         ## any of it down right here" — reads as an inventory sentence, and
         ## a live player went hunting for an item-transfer option that does
         ## not exist and never did. Every option here is a thing SAID.
-        ## Wave finding (2026-08-16, freeopus4): the "carried alone" framing
+        ## Play finding (2026-08-16): the "carried alone" framing
         ## re-printed verbatim right after she had said the big thing — false
         ## the moment any disclosure lands. The framing now moves to narration
         ## and knows what he already holds; the caption stays a saying-prompt.
@@ -2886,7 +2892,7 @@ label hub_telescope:
     scene bg_telescope with fade
     with echo_room_beat
 
-    ## Entry cost rule (2026-08-14, round 4): a room charges for the WALK, not
+    ## Entry cost rule (2026-08-14): a room charges for the WALK, not
     ## for being entered. 5 minutes on a first visit or on an entry that
     ## carries a beat, 0 on a quiet repeat \u2014 the finest increment on the clock,
     ## so stepping through a door is never a trap. Everything she DOES inside
@@ -2940,7 +2946,7 @@ label hub_telescope:
         ## ENTRY IS A CHOICE (2026-08-18, user play session \u2014 same rule as
         ## the storage rack): the map used to auto-open on first entry. Now
         ## the room offers it, and "later" keeps the offer standing.
-        ## ROOM OFFERS, TOGETHER (2026-08-18, user review round 2): the
+        ## ROOM OFFERS, TOGETHER (2026-08-18, user review): the
         ## integration belongs on this menu, not behind the map-decline —
         ## picking "later" and then being offered the night's biggest
         ## commitment read as the offers arriving backwards. Declining now
@@ -2982,7 +2988,7 @@ label hub_telescope:
 
         aria_nvl "Dr. Voss, the anomalous signal\u2019s bearing is marked. The regions are free to browse; the readings are not."
 
-        ## Cost legibility (round 3): the star map serves three actions at
+        ## Cost legibility: the star map serves three actions at
         ## three prices — known sources 5, the anomaly cluster 15, and the
         ## carrier analysis 30/45 — and only the analysis is a 30+ minute
         ## spend. The region pick IS the commitment, and the cost is not
@@ -3080,7 +3086,7 @@ label hub_telescope:
         if storm_intensity >= 2:
             narrator_nvl "The star map is done and reviewed. The instruments have given up on the sky and are recording the storm instead \u2014 data nobody asked for, kept anyway."
             if not origin_sweep_done and not origin_sweep_running:
-                ## Sol round-9: branch on the staged plan, not the interruption
+                ## Branch on the staged plan, not the interruption
                 ## counter — a failed arm is staged with zero interruptions,
                 ## and the menu below will offer Resume, so the narration must
                 ## agree with it.
@@ -3132,7 +3138,7 @@ label hub_telescope_after_map:
                     narrator_nvl "The dome picks its stare back up where it left off."
                     $ _storm_minutes_spent = 5
                     call spend_storm_time
-                    ## Sol round-7: same re-validation on the resume tick.
+                    ## Same re-validation on the resume tick.
                     if eot_sweep_conditions_ok():
                         $ origin_sweep_running = True
                     else:
@@ -3243,7 +3249,7 @@ label telescope_start_integration:
         aria_nvl "Fair warning: at this storm intensity, clean minutes accumulate slowly. The measurement will crawl."
     $ _storm_minutes_spent = 15
     call spend_storm_time
-    ## Sol round-7/8: the setup tick itself can take the array
+    ## The setup tick itself can take the array
     ## down (damage, drift, threshold rise). The plan is built
     ## either way — staged unlocks the 5-min resume — but a
     ## failed arm is NOT an integration interruption: nothing
@@ -3253,7 +3259,7 @@ label telescope_start_integration:
     if eot_sweep_conditions_ok():
         $ origin_sweep_running = True
     else:
-        ## Billed-for-a-no-op (cost round 6, live-run item):
+        ## Billed-for-a-no-op (live-run item):
         ## the mechanic is sound — the plan banks, and the
         ## resume is five minutes, not fifteen — but the old
         ## line led with the failure and put the promise
@@ -3377,7 +3383,7 @@ label hub_comms:
     ## (2026-08-18 room-menu round) — they are per-SESSION, and the session
     ## begins at the sit-down now, not at the room's doorstep.
 
-    ## Entry cost rule (round 4, see hub_telescope): 5 for a first visit or an
+    ## Entry cost rule (see hub_telescope): 5 for a first visit or an
     ## entry that carries a beat, 0 for a quiet repeat. Read BEFORE anything
     ## flips; the corridor encounter below tops it up if it fires. Questions
     ## keep their own 8-minute windows (before the live cold tax).
@@ -3460,7 +3466,7 @@ label hub_comms:
             ## Cost legibility: the setpiece is the night's biggest spend.
             ## His hour is a human's estimate and stays one; ARIA quotes the
             ## real taxed cost, as she does for the antenna repair and the
-            ## origin trace (cost round 6, two live runs: quoted "an hour",
+            ## origin trace (two live runs: quoted "an hour",
             ## charged 93). LOCKSTEP: setpiece_two_person_repair charges this
             ## exact nominal, and nothing between here and that spend moves the
             ## clock — the "we go together" arm jumps straight to it — so the
@@ -3555,7 +3561,7 @@ label hub_comms:
     scene bg_comms with fade
     with echo_room_beat
 
-    ## The whisper's second door (round 4): the comms room, for everyone. It
+    ## The whisper's second door: the comms room, for everyone. It
     ## has to land in the DOORWAY — before the spares cabinet, before the
     ## preamp menu, and long before the terminal comes up — because the whole
     ## point of this beat is that the probe speaks unbidden and she has no way
@@ -3686,7 +3692,7 @@ label comms_terminal:
     ## comms_leave's teardown notice: every jump into comms_leave comes
     ## from this session.
     $ _comms_out_of_time = False
-    ## Session-start capture (was room-entry, review #2): overhearing keys
+    ## Session-start capture (was room-entry): overhearing keys
     ## on who was outside the door when she began TALKING — which is now
     ## the sit-down, not the walk-in.
     $ _comms_marcus_at_entry = eot_marcus_location()
@@ -3902,7 +3908,7 @@ label comms_terminal:
     ## 8 minutes per question (2026-08-18, user rebalance — was 16; the
     ## LOCKSTEP spends below and this banner move together).
     $ _query_signal_cost = 2 if specialization == "signals" else 4
-    ## F3 wave (windows): the flat "8 MIN" banner under-quoted once the storm
+    ## The flat "8 MIN" banner under-quoted once the storm
     ## tax kicked in (realized 8→10→11 across phases), and the bad-link ARIA
     ## bleed below was advertised nowhere — she went 100→51 and the player
     ## only found it in the arithmetic. Quote the taxed figure live (the
@@ -3918,7 +3924,7 @@ label comms_terminal:
     if max(0, signal_strength - _query_signal_cost) < 40:
         call terminal_system("{color=#ffcc66}LINK POOR — ARIA CARRIES THE ERROR CORRECTION. EACH QUESTION DRAWS ON HER COHERENCE.{/color}")
         $ _query_aria_bleed_warned = True
-    ## Wave finding (2026-08-16, freesonnet4): with under a window left the
+    ## Play finding (2026-08-16): with under a window left the
     ## charge clamps to time-zero and the climax cuts the session mid-window —
     ## which is the design, but the banner promised minutes the night doesn't
     ## have. Say so up front; the player spends their last question knowingly.
@@ -3928,7 +3934,7 @@ label comms_terminal:
 
     ## One-click question list, rendered into the log itself. The two-step
     ## station interaction is in the lab audit console.
-    ## R5-4: `echo7_asked_ever` persists across visits — a question asked once is
+    ## `echo7_asked_ever` persists across visits — a question asked once is
     ## asked for good (no re-ask farming of trust/evidence). Late visits can
     ## therefore exhaust a pool, so visits >= 4 open with an exit available.
     ## An active antenna incident also permits an immediate exit: inspecting
@@ -4014,7 +4020,7 @@ label comms_terminal:
     ## B2: every ECHO-7 question costs time (compressing packets through storm
     ## static) and burns a little signal bandwidth. Applied here for the first
     ## question so the tier above is unaffected by it. The signal cost lands
-    ## BEFORE the tick (Sol round-3): it is the transmission's own bandwidth,
+    ## BEFORE the tick: it is the transmission's own bandwidth,
     ## and spend_storm_time's sweep validation must see it.
     ## Specialization: signals rides the carrier's own timing — half the
     ## bandwidth burn per question (design doc: efficiency in your domain).
@@ -4082,7 +4088,7 @@ label comms_terminal:
                 $ _comms_question_thread = "mug"
                 call echo7_included_followup(_visit, reconnect=(_was_late_signal_reconnect == 2))
             ## B2: each additional question costs time + signal, same as the
-            ## first — signal before the tick (Sol round-3, see above).
+            ## first — signal before the tick (see above).
             $ signal_strength = max(0, signal_strength - (2 if specialization == "signals" else 4))
             ## B-1(c): same integrity bleed on a bad link as the first question.
             if signal_strength < 40:
@@ -4562,7 +4568,7 @@ label setpiece_two_person_repair:
     ## B-4: the "right about everything" interiority is false on the blocked
     ## path — she never reconnected, so there were no verified predictions to
     ## trust. Blocked variant keeps the beat honest.
-    ## R5-9: read_all_logs is the verified-prediction history — a late
+    ## read_all_logs is the verified-prediction history — a late
     ## reconnect (unblocked at the array) never got the transmission log, so
     ## the full framing overstates for them too.
     if marcus_told_signal:
@@ -4655,7 +4661,7 @@ label setpiece_two_person_repair:
                 else:
                     marcus "That's why you've been living at the lab terminal."
             else:
-                ## R5-9: late reconnect — she has a name-that-knew-her and a
+                ## Late reconnect — she has a name-that-knew-her and a
                 ## reopened door, not a verified-prediction record.
                 elara "The night before the grant call, something on the hydrogen line said my name. I blocked it — and this storm, I couldn't stand the quiet anymore. I opened the door again."
                 marcus "..."
@@ -4761,7 +4767,7 @@ label hub_lab:
     scene bg_lab with fade
     with echo_room_beat
 
-    ## Entry cost rule (round 4, see hub_telescope): 5 for a first visit or an
+    ## Entry cost rule (see hub_telescope): 5 for a first visit or an
     ## entry that carries a beat, 0 for a quiet repeat. _entry_cost is an
     ## ACCUMULATOR — each arrival beat below sets it rather than the arithmetic
     ## being restated in one unreadable predicate, which is also how the two
@@ -4964,8 +4970,9 @@ label hub_lab:
         ## enabled caption is still the exact string it always was.
         ##
         ## MECHANISM, AND WHY NOT THE OTHER ONE (live finding 2026-08-17). The
-        ## item stays CONDITIONED and the menu arms
-        ## `config.menu_include_disabled` around itself. Ren'Py then builds the
+        ## item stays CONDITIONED and the menu passes (include_disabled=True),
+        ## which eot_menu_arguments turns into `config.menu_include_disabled`
+        ## for this menu only. Ren'Py then builds the
         ## item with `ChoiceReturn(..., sensitive=False)`, so the option is
         ## drawn and is genuinely unselectable — by hand and through the
         ## vnflight bridge alike. The tempting alternative — dropping the
@@ -4976,14 +4983,15 @@ label hub_lab:
         ## `marcus_relationship += 1` a second time. A one-shot must be one-shot
         ## at the VALUE, not at the widget.
         ##
-        ## The flag is process-global, so it is armed for THIS menu, disarmed
-        ## on every arm (including the one that jumps out), and disarmed again
-        ## at the top of act2_hub as the net — every room path returns through
-        ## the hub, so it cannot reach a mutually-exclusive variant menu
-        ## elsewhere (the sweep's start/resume pair, the doorway's two openers)
-        ## and grow a greyed twin there.
+        ## Including disabled rows covers EVERY conditioned item of the menu,
+        ## and the disclosure row is one the player has no reason to know
+        ## about before the search starts. It is withheld through
+        ## the menu's `set`, which removes a caption before conditions are
+        ## read: absent for humans and agents alike until it can be chosen,
+        ## where a screen-side hide had left agents an "Unavailable" row
+        ## before.
         ##
-        ## GAP CLOSED (2026-08-18 shim round, was KNOWN GAP): the scraper
+        ## GAP CLOSED (2026-08-18, was KNOWN GAP): the scraper
         ## now records insensitive Return-class widgets instead of skipping
         ## them, and the stale-drop counts scraped disabled buttons as
         ## rendered — agents see this one-shot listed as
@@ -4993,7 +5001,6 @@ label hub_lab:
         ## the same affordance.
         $ _lab_talked_note = "" if not marcus_lab_talked else "  (Already talked to Marcus here.)"
         $ _lab_marcus_wait_cost = eot_cold_taxed(30)
-        $ config.menu_include_disabled = True
 
         ## Pay for the walk already completed before offering the free door
         ## back out. The other arms used to reach the common payment below,
@@ -5005,15 +5012,18 @@ label hub_lab:
         if time_remaining <= 0:
             jump storm_time_out
 
-        menu (nvl=True):
+        ## Read after the walk is paid: the payment advances the night.
+        $ _lab_can_disclose = coherence_scan_known and (coherence_scan_running or coherence_found) and not marcus_told_search and not marcus_locked_partition
+        $ _lab_withheld = [] if _lab_can_disclose else ["Tell Marcus about ARIA's search of his partition."]
+        menu (nvl=True, include_disabled=True):
+            set _lab_withheld
             "The audit console is on the main desk. Eight feet from his chair."
 
-            ## Cost legibility (round 3): a passive task says how long it
+            ## Cost legibility: a passive task says how long it
             ## takes, in the room-wait captions' diction. The post-hoc "Half
             ## an hour later" narration below stands — the caption prices the
             ## choice, the prose still plays the wait.
             "Find something else to do until he leaves. ([_lab_marcus_wait_cost] minutes)":
-                $ config.menu_include_disabled = False
                 narrator_nvl "She wheels the diagnostics cart to the far bench and gives her hands a job \u2014 cable checks nobody scheduled, connector by connector. Half an hour later Marcus stretches, collects the mug, and goes to see about the intake heaters."
                 narrator_nvl "The lab is hers."
                 $ marcus_lab_present = False
@@ -5021,16 +5031,13 @@ label hub_lab:
                 $ _storm_minutes_spent = 30
                 call spend_storm_time
 
-            "Tell Marcus about ARIA's search of his partition." if coherence_scan_known and (coherence_scan_running or coherence_found) and not marcus_told_search and not marcus_locked_partition:
-                $ config.menu_include_disabled = False
+            "Tell Marcus about ARIA's search of his partition." if _lab_can_disclose:
                 jump lab_marcus_disclose_search
 
             "Talk to him.[_lab_talked_note]" if not marcus_lab_talked:
-                $ config.menu_include_disabled = False
                 call lab_marcus_early_conversation
 
             "Sit down at the audit console anyway.":
-                $ config.menu_include_disabled = False
                 $ _lab_sit_now = True
 
             ## User nit (2026-08-17): the catch room offered three
@@ -5040,7 +5047,6 @@ label hub_lab:
             ## User rule (2026-08-17): leaving a room because Marcus is in it
             ## costs nothing — the door out is always free, in every room.
             "Leave him to it.":
-                $ config.menu_include_disabled = False
                 narrator_nvl "The audit can keep until the lab is empty. She backs out before he turns."
                 nvl hide echo_mode_dissolve
                 nvl clear
@@ -5113,7 +5119,7 @@ label hub_lab:
         ## condition is `_recovery_can_try`, which subtracts the spent attempt
         ## and any period when Marcus is standing at the side console. He would
         ## not passively watch Elara spend an hour attacking the lock he set.
-        ## Do not arm config.menu_include_disabled here. It applies to the
+        ## Do not pass (include_disabled=True) here. It applies to the
         ## whole menu, so preserving one exhausted recovery row also exposes
         ## every mutually exclusive Lab action as disabled. The console
         ## caption carries the exhausted-attempt receipt instead.
@@ -5125,7 +5131,6 @@ label hub_lab:
             narrator_nvl "Marcus picks up his mug and leaves the lab. The door closes softly."
         $ _audit_marcus_was_present = _marcus_in_lab
         $ _recovery_can_try = _seal_window and not recovery_attempted and not _marcus_in_lab
-        $ config.menu_include_disabled = False
 
         ## The console is never unusable — it is furniture that works — so a
         ## disabled console option would be a lie. What the room CAN say
@@ -5169,7 +5174,7 @@ label hub_lab:
         $ _scan_resume_operational = coherence_scan_stop_reason == "stealth" and coherence_scan_stopped_at is not None and time_remaining < coherence_scan_stopped_at
         $ _scan_resume_available = coherence_scan_stopped and not coherence_found and not marcus_locked_partition and eot_marcus_location() != "lab" and (_scan_resume_operational or _scan_resume_new_evidence)
         $ _scan_assist_available = aria_motive_asked and coherence_scan_known and coherence_scan_running and not coherence_found and not marcus_locked_partition and not coherence_scan_assisted and eot_marcus_location() != "lab" and (coherence_scan_target - coherence_scan_progress) > 15
-        ## F4 stealth assists (user design 2026-08-19, split round 2): two
+        ## Stealth assists (2026-08-19, split): two
         ## UN-ALERTING ways to help ARIA's search — no signed ledger job, no
         ## announcement. BOTH gated on aria_motive_asked: until Elara has
         ## actually investigated the scan (we know she does something AND
@@ -5201,7 +5206,7 @@ label hub_lab:
         ## only; lab_room_returns defaults in game_variables (flattener reads
         ## default_sources) and resets in start.
         $ lab_room_returns += 1
-        ## F3 wave (roleplay, + f2): the two lab idle strings repeated
+        ## The two lab idle strings repeated
         ## verbatim "often" and broke immersion — the return lines now
         ## rotate. Same content register, no new
         ## information, so the flattener and sweep are unaffected (nothing
@@ -5236,43 +5241,33 @@ label hub_lab:
         menu (nvl=True):
 
             "Go to the audit console.[_console_note]":
-                $ config.menu_include_disabled = False
                 jump lab_console
 
             "Read CONVERGENCE.DAT and retain a local copy. ([_convergence_read_cost] minutes)" if _convergence_read_available:
-                $ config.menu_include_disabled = False
                 jump lab_read_convergence
 
             "Trace CONVERGENCE.DAT through the local indexes. ([_convergence_computing_cost] minutes)" if _convergence_probe_computing:
-                $ config.menu_include_disabled = False
                 jump lab_prepare_convergence
 
             "Correlate CONVERGENCE.DAT with station traffic. ([_convergence_other_cost] minutes)" if _convergence_probe_signals:
-                $ config.menu_include_disabled = False
                 jump lab_prepare_convergence
 
             "Compare Marcus’s partition against controller load. ([_convergence_other_cost] minutes)" if _convergence_probe_physics:
-                $ config.menu_include_disabled = False
                 jump lab_prepare_convergence
 
             "Decide whether ARIA should run the prepared targeted search." if _scan_commission_available and not coherence_scan_standby:
-                $ config.menu_include_disabled = False
                 jump lab_convergence_decision
 
             "Reconsider leaving the prepared search to ARIA's judgment." if _scan_commission_available and coherence_scan_standby:
-                $ config.menu_include_disabled = False
                 jump lab_convergence_decision
 
             "Question ARIA about the partition scan." if _aria_investigation_available and coherence_scan_commissioned:
-                $ config.menu_include_disabled = False
                 jump lab_aria_investigate
 
             "Investigate ARIA’s unsanctioned scan." if _aria_investigation_available and not coherence_scan_commissioned:
-                $ config.menu_include_disabled = False
                 jump lab_aria_investigate
 
             "Resume ARIA’s partition scan." if _scan_resume_available:
-                $ config.menu_include_disabled = False
                 if coherence_scan_stop_reason == "stealth":
                     elara_nvl "Marcus is elsewhere. Resume the partition scan, quietly. If the access ledger moves, stop before he has to wonder why."
                     aria_nvl "Resuming from the preserved index. I will keep the process below the ordinary audit threshold for as long as I can."
@@ -5287,7 +5282,6 @@ label hub_lab:
                 jump act2_checkpoint_lab
 
             "Help ARIA index the partition scan. ([_scan_assist_cost] minutes)" if _scan_assist_available:
-                $ config.menu_include_disabled = False
                 $ coherence_scan_assisted = True
                 $ marcus_scan_assist_logged = True
                 ## Storage is the one genuinely hands-full leg of Marcus's
@@ -5309,7 +5303,6 @@ label hub_lab:
                 jump act2_checkpoint_lab
 
             "Quietly lend the search idle cycles. ([_scan_boost_cost] minutes)" if _scan_boost_available:
-                $ config.menu_include_disabled = False
                 $ scan_boost_count += 1
                 $ scan_boost_last_at = time_remaining
                 $ coherence_scan_target = max(30, coherence_scan_target - 10)
@@ -5336,7 +5329,6 @@ label hub_lab:
                 jump act2_checkpoint_lab
 
             "Re-phase the search to spare her core. ([_scan_damp_cost] minutes)[_damp_note]" if _scan_damp_available:
-                $ config.menu_include_disabled = False
                 $ scan_damp_count += 1
                 ## A physicist doesn't ease the decoherence — she cancels it,
                 ## and the trick holds for a full hour. Everyone else halves
@@ -5365,11 +5357,9 @@ label hub_lab:
                 jump act2_checkpoint_lab
 
             "Tell Marcus about ARIA's search of his partition." if _early_search_disclosure:
-                $ config.menu_include_disabled = False
                 jump lab_marcus_disclose_search
 
             "Talk to Marcus at the side console." if _early_lab_marcus or (_late_lab_marcus and not _fm_nothing):
-                $ config.menu_include_disabled = False
                 if _early_lab_marcus:
                     call lab_marcus_early_conversation
                     nvl clear
@@ -5386,8 +5376,7 @@ label hub_lab:
             ## in recovery_attempt: a costly, fallible push that can take the
             ## clock to zero.
             "Try to force the sealed partition. It will eat most of the night, and it may hold anyway." if _recovery_can_try:
-                $ config.menu_include_disabled = False
-                ## Late-attempt honesty (live-run item, recovryrun debrief):
+                ## Late-attempt honesty (live-run item):
                 ## when the night is mathematically shorter than the method's
                 ## time floor, ARIA says so before the hours are spent. The
                 ## doomed attempt stays a legitimate, poignant choice — made
@@ -5425,7 +5414,6 @@ label hub_lab:
             ## tick's cold drain and scan credit both work on the recovered
             ## state.
             "Install a coolant cartridge in ARIA’s cluster loop. ([_coolant_cost] minutes)" if coolant_cartridges > 0 and aria_integrity < 100:
-                $ config.menu_include_disabled = False
                 narrator_nvl "The cluster loop’s service port is behind the desk panel, at ankle height, where the cold finds the floor first."
                 $ coolant_cartridges -= 1
                 $ aria_integrity = min(100, aria_integrity + 35)
@@ -5446,13 +5434,11 @@ label hub_lab:
             ## stay, so a trip through "Back." (which costs nothing) cannot
             ## move the encounter window.
             "Wait, and stay at the bench.":
-                $ config.menu_include_disabled = False
                 $ _wait_marcus_before = eot_marcus_location()
                 $ _wait_minutes = 0
                 jump terminal_done_wait
 
             "Leave the lab.":
-                $ config.menu_include_disabled = False
                 nvl hide echo_mode_dissolve
                 nvl clear
                 jump act2_hub
@@ -5719,13 +5705,13 @@ label lab_console:
     ## substitution, so the `%%` escape that dialogue needs renders here
     ## literally — this row was printing "41%% // rate: throttled" on the
     ## panel. Screen text (observatory_hud) has always used a single sign for
-    ## the same reason. Pinned in tests/test_build.py.
+    ## the same reason. Pinned in the build tests.
     ##
     ## The scan status was a non-interactive line on the old panel; it is a log
     ## row now, written when she sits down. The labels track the REAL
     ## eot_coherence_rate tiers (75/60/45/20) — the retune leans on players
     ## reading degradation and answering with power, so every rate transition
-    ## must be visible (Sol economy review 2, #4). Script-side single-line
+    ## must be visible. Script-side single-line
     ## conditions, so the flattener reads the console as a player does.
     if coherence_scan_running and not coherence_found and coherence_scan_known:
         $ _coh_pct = int(min(100, 100 * coherence_scan_progress / max(1, coherence_scan_target)))
@@ -6047,7 +6033,7 @@ label lab_console:
             ## One-shot diegetic acknowledgment once it shows.
             if _topic in ("trust", "temporal"):
                 $ aria_integrity = max(0, aria_integrity - 6)
-                ## Fires on the FIRST charged topic (Sol review 2, #3): the
+                ## Fires on the FIRST charged topic: the
                 ## cost must be named when it is incurred, not at a later
                 ## threshold the causal decisions never see.
                 if not aria_analysis_cost_seen:
@@ -6164,7 +6150,7 @@ label topic_chen:
 
 
 ## --- The source audit: a COMMISSION, not a sitting (2026-08-17) -------------
-## design/DESIGN_echoes_process_log.md §2. A 45-minute FOREGROUND sink decided
+## A 45-minute FOREGROUND sink decided
 ## a whole live run by itself, which is the definition of a toll booth. What
 ## the work is has not changed — ARIA reads her own source against her own
 ## trust chain — but whose minutes it spends has: ten of Elara's to frame the
@@ -6737,7 +6723,7 @@ label hub_generator_menu:
     if time_remaining <= 0:
         jump storm_time_out
 
-    ## F2 wave (2026-08-19): ARIA's arrival quote is computed at ENTRY, but
+    ## 2026-08-19: ARIA's arrival quote is computed at ENTRY, but
     ## the storm can escalate before the click — two runs were quoted "call
     ## it 45" and charged the taxed 56. The label now carries the live taxed
     ## estimate, recomputed each loop pass. This is not a new pricing policy:
@@ -6795,7 +6781,7 @@ label hub_generator_menu:
             nvl clear
             jump act2_checkpoint_generator
 
-        ## Cost legibility (round 6, three live runs): setting a priority and
+        ## Cost legibility (three live runs): setting a priority and
         ## confirming charged time with no price stated
         ## anywhere. ARIA quotes the real taxed cost through eot_cold_taxed,
         ## spend_storm_time's lockstep partner, and names the free option,
@@ -6983,8 +6969,8 @@ label hub_habitat:
     scene bg_habitat_module with fade
     with echo_room_beat
 
-    ## Entry cost rule (round 4, see hub_telescope). Round 3 made walking in
-    ## a flat 5; round 4 makes it conditional, like every other room — 5 on a
+    ## Entry cost rule (see hub_telescope). Walking in used to be
+    ## a flat 5; now it is conditional, like every other room — 5 on a
     ## first visit or an entry that carries a beat, 0 when she puts her head
     ## round the door of a room she has already emptied. Accumulator; read
     ## before habitat_visited flips.
@@ -7022,7 +7008,7 @@ label habitat_marcus_tea:
     menu:
         "The chair across from him is pulled out. It would be easy."
 
-        ## Cost legibility (round 3): priced in the caption, in the
+        ## Cost legibility: priced in the caption, in the
         ## room-wait diction — sitting down with him is a half hour now
         ## (was 45), and the player knows that before the chair moves.
         "Sit with him. ([_habitat_sit_cost] minutes)":
@@ -7096,10 +7082,10 @@ label hub_habitat_body:
     if not habitat_cell_found:
         narrator_nvl "The emergency locker by the door still carries its inspection sticker from two summers ago. Nobody has audited the cabins since the winter crew rotated out, either."
 
-    ## Entry restructure (2026-08-14 economy round 3, conditional in round 4):
+    ## Entry restructure (2026-08-14, later made conditional):
     ## walking into the habitat costs 5 — the walk, not an hour of the night.
     ## The old unconditional 45 was the room's domestic wait charged to everyone
-    ## who put their head round the door; round 4 drops even the 5 once the
+    ## who put their head round the door; now even the 5 is dropped once the
     ## room has nothing new in it. Doing things here still costs what they
     ## cost: sitting with Marcus 30, taking a ration and going 10 (both
     ## charged in the encounter, which jumps straight back to the hub and
@@ -7245,7 +7231,7 @@ label hub_storage:
     scene bg_storage with fade
     with echo_room_beat
 
-    ## Entry cost rule (round 4, see hub_telescope). 2026-08-18: the rack
+    ## Entry cost rule (see hub_telescope). 2026-08-18: the rack
     ## sweep is now a CHOICE, so storage_supplies_found no longer doubles as
     ## the first-entry flag — a player who declined the rack must not pay
     ## entry twice. storage_visited is the entry flag.
@@ -7308,7 +7294,7 @@ label hub_storage:
         menu:
             "The crates go back three rows deep."
 
-            ## Cost legibility (round 3): the hunt still costs 30; the caption
+            ## Cost legibility: the hunt still costs 30; the caption
             ## now says so, in the room-wait diction.
             "Help him search. ([_storage_hunt_cost] minutes)" if storage_supplies_found:
                 $ storage_hunt_together = True
@@ -7346,7 +7332,7 @@ label hub_storage:
                 with dissolve
                 $ _storm_minutes_spent = 35
                 call spend_storm_time
-            ## Cost legibility (round 6, live-run item): declining the hunt is
+            ## Cost legibility (live-run item): declining the hunt is
             ## not free — she still walked down, cleared the rack by the door,
             ## and traded a word with him, and this arm jumps back to the hub
             ## without the room's 5-minute entry ever being paid, so the ten
@@ -7414,11 +7400,11 @@ label hub_storage_menu:
             call spend_storm_time
             jump act2_checkpoint_storage
 
-        ## Sol economy review (items): this beat used to grant a THIRD power
+        ## Economy (items): this beat used to grant a THIRD power
         ## cell, quietly breaking the two-cells-versus-three-sinks scarcity
         ## the start-with-nothing pass is built on. The rack arm above is the
         ## room's item payoff; this survey is where she learns the manifest
-        ## lies — which is what the wait captions are about. Round 4 left its
+        ## lies — which is what the wait captions are about. The entry-cost pass left its
         ## price alone; 2026-08-18 left the price and moved the CONSENT.
         "Read the shelves against the manifest. ([_storage_manifest_cost] minutes)" if not storage_scavenged:
             $ storage_scavenged = True
@@ -7582,7 +7568,7 @@ label recovery_attempt:
         ## Her home ground: a direct breach. Fastest, highest reliability, but
         ## it LEAVES EVIDENCE — Marcus learns the exact minute the seal gave.
         $ _rec_cost = 45
-        ## Sol economy review 2, #1: the check is "does the WORK fit the
+        ## The check is "does the WORK fit the
         ## night", and the cold tax is part of the work — all four methods.
         $ _rec_success = time_remaining >= eot_cold_taxed(45)
         call terminal_system("{color=#ff8844}MANUAL BREACH — DR. CHEN PARTITION (SEALED){/color}")
@@ -7640,7 +7626,7 @@ label recovery_attempt:
     call spend_storm_time
 
     ## Signals burns the line to the future whether or not it worked. The
-    ## relay is spent — Act 3 (Sol review #1) treats ECHO-7 as gone even on an
+    ## relay is spent — Act 3 treats ECHO-7 as gone even on an
     ## open signal, so a signals-recovery player loses the Aurora option and
     ## the On-Faith no-file ending.
     if _rec_method == "signals":
@@ -7669,7 +7655,7 @@ label recovery_attempt:
         call terminal_system("{color=#ff4444}FORCE READ FAILED — SEAL HELD{/color}")
         if _rec_method == "computing":
             call terminal_aria("It adapted, Dr. Voss. Every path I opened, the seal closed a step ahead of us. He built it to be broken into — and to remember the shape of anyone who tried.")
-            ## The seal logged the failed breach (sweep F5): Marcus WILL know
+            ## The seal logged the failed breach: Marcus WILL know
             ## someone leaned on his door. The no-file confrontation keys on it.
             $ recovery_left_trace = True
         elif _rec_method == "signals":
@@ -7871,7 +7857,7 @@ label act2_storm_climax:
 
     ## Bible 6d climax rewiring — three entry states: caught live in the lab,
     ## ARIA-notified, or the fallback sweep. Careful and reckless investigation
-    ## finally arrive at different doorways. Recovery (Sol review #2) takes
+    ## finally arrive at different doorways. Recovery takes
     ## priority: if she FORCED his sealed partition, that is what he leads with
     ## — a fallback-diagnostic or administrator-override framing would be wrong.
     if file_recovered:
@@ -7993,7 +7979,7 @@ label act2_storm_climax:
     $ _audited_partition = ("chen" in topics_read) or ("aria_code" in topics_read) or ("liaison" in topics_read)
     $ _console_admission = marcus_caught_live and marcus_told_search and not (file_recovered or convergence_opened)
     if file_recovered:
-        ## Sol review #2: she forced the seal — own it, do not attribute to ARIA.
+        ## She forced the seal — own it, do not attribute to ARIA.
         $ _convergence_admission = "I forced your seal and read it myself. CONVERGENCE.DAT."
     elif convergence_opened:
         $ _convergence_admission = "I chose to open CONVERGENCE.DAT. I read the code and kept a copy."
@@ -8019,7 +8005,7 @@ label act2_storm_climax:
         $ _doorway_prompt = "His voice is not hurt now. It is afraid."
     else:
         $ _doorway_prompt = "His voice is quiet. Not angry. Something worse \u2014 hurt."
-    ## Sweep F7: transient \u2014 did she say the filename in this doorway? The
+    ## Transient \u2014 did she say the filename in this doorway? The
     ## hotter beat's "standing here saying that name" depends on it.
     $ _named_file = False
     menu:
@@ -8037,7 +8023,7 @@ label act2_storm_climax:
                 elara "I know. And Marcus \u2014 we need to talk about it."
             jump act2_marcus_confrontation
 
-        ## Sol round-2 #2: this deflection is unavailable once she FORCED the
+        ## This deflection is unavailable once she FORCED the
         ## seal \u2014 Marcus just named it a break-in; "it was a security sweep"
         ## would be an absurd lie, not a plausible one.
         "\u201cARIA flagged an anomaly during a security sweep. I had to check.\u201d" if not file_recovered:
@@ -8073,7 +8059,7 @@ label act2_marcus_confrontation:
     ## idealist, never gloating. The non-recovered flow below is unchanged.
     if file_recovered:
         show marcus suspicious
-        ## Sweep F7: "saying that name" only if she actually said it in the
+        ## "Saying that name" only if she actually said it in the
         ## doorway — the "something bigger" deflection never names the file.
         if _named_file:
             marcus "I sealed that partition myself. Personal credentials, below the fallback layer, in the middle of a whiteout. There is exactly one way you are standing here saying that name to me."
@@ -8133,7 +8119,7 @@ label act2_marcus_confrontation:
 
     ## The liaison artifact pays off in person (audit D3): Elara can meet his
     ## grievance with the record of it \u2014 and owns her own line-crossing doing so.
-    ## R5-5: if he CAUGHT her in the spool, "you went through my mail" is not
+    ## If he CAUGHT her in the spool, "you went through my mail" is not
     ## news \u2014 the exchange becomes about what the reading changed.
     if "liaison" in topics_read:
         if marcus_catch_topic == "liaison":
@@ -8154,7 +8140,7 @@ label act2_marcus_confrontation:
     ## claim to have read the files / run the audit she never touched.
     if marcus_told_signal:
         ## A prior signal confession changes what this scene can be about.
-        ## B-3/R5-10: the "your files / ARIA's own code" boast needs the ACTUAL
+        ## B-3: the "your files / ARIA's own code" boast needs the ACTUAL
         ## reads (his profile or mail, plus the source audit) \u2014 theme tags are
         ## auto-granted (advisory \u2192 marcus, telescope note \u2192 aria) and leak.
         if blocked_signal:
@@ -8175,7 +8161,7 @@ label act2_marcus_confrontation:
                     elara "I\u2019ve spent the storm checking everything I could reach. Your files. ARIA\u2019s own code. And the signal, Marcus \u2014 the one I told you about in the lab."
             else:
                 elara "I\u2019ve spent the storm listening to something impossible, Marcus \u2014 and believing it more than I want to."
-            ## R5-8: "it made accusations" requires the signal to have actually
+            ## "It made accusations" requires the signal to have actually
             ## pointed at him \u2014 knows_convergence_file is set only by ECHO-7
             ## lines that name his partition.
             if marcus_told_accusation:
@@ -8189,7 +8175,7 @@ label act2_marcus_confrontation:
                 elara "No. It never mentioned you. That part, ARIA and I managed all by ourselves."
     elif not blocked_signal and "aria_code" in topics_read and ("chen" in topics_read or "liaison" in topics_read) and len(evidence_log) >= 6:
         ## Player has genuinely done the digging the list claims \u2014 and has a
-        ## signal to slip (R5-10: blocked players excluded; they have no signal).
+        ## signal to slip (blocked players excluded; they have no signal).
         elara "I\u2019ve spent the last six hours investigating everything. The signal. Your files. ARIA\u2019s own code."
         elara "I know more than you think."
         if marcus_knows_message:
@@ -8205,9 +8191,9 @@ label act2_marcus_confrontation:
             marcus "...What signal?"
             elara "Later. One impossible thing at a time."
     elif aria_warned and not file_recovered and not convergence_opened:
-        ## R5-10: the line number came from the audit findings or ECHO-7's
+        ## The line number came from the audit findings or ECHO-7's
         ## technical answer \u2014 the visit-2 auto-reveal alone never gave it.
-        ## Sweep F6: gated off recovery routes \u2014 he watched her force the seal
+        ## Gated off recovery routes \u2014 he watched her force the seal
         ## and said so; "How\u2014" / "It doesn't matter how" would be absurd.
         if "aria_code" in topics_read or "analytical_vuln" in echo7_asked_ever:
             elara "I know about the vulnerability in VERIFY_TRUST. Line 4,417. The cipher downgrade."
@@ -8226,7 +8212,7 @@ label act2_marcus_confrontation:
             marcus "I\u2019ve modeled it. The disruption would last 72 hours at most\u2014"
             elara "72 hours without air traffic control? Without hospital systems? Marcus, do you hear yourself?"
             marcus "..."
-            ## Wave finding (2026-08-16, freeopus4) + review2: on disclosure
+            ## Play finding (2026-08-16): on disclosure
             ## routes he heard about the sweep from her face \u2014 "behind my
             ## back" contradicted the credit he gave eight lines earlier.
             ## His counter-punch survives on the honest ground: telling
@@ -8237,7 +8223,7 @@ label act2_marcus_confrontation:
                 marcus "You went through my files without asking me. And now you\u2019re lecturing me about ethics?"
             elara "Yes. Because someone has to."
             marcus "..."
-            ## Review2: the old "You sound like her / like someone who
+            ## The old "You sound like her / like someone who
             ## already knows how this ends" implied a foreknowledge nothing
             ## seeded. His deflection now runs through his own dead \u2014 and
             ## "Never mind" is him hearing what he's doing with them.
@@ -8302,7 +8288,7 @@ label act3_start:
 
     narrator_nvl "The storm broke on the morning of March 6."
 
-    ## F4 wave (scanwear, user design 2026-08-19): a run can end the night
+    ## 2026-08-19: a run can end the night
     ## with ARIA at (or near) zero and the epilogues then show her actively
     ## reviewing migration paths — the gap needed a SHOWN recovery, not a
     ## silent one. With the storm's load gone she rebuilds to minimum
@@ -8313,7 +8299,7 @@ label act3_start:
         narrator_nvl "ARIA came back the way frostbite leaves: from the core outward. By noon she had rebuilt herself to minimum operational coherence — twenty percent, self-reported, self-verified twice."
         narrator_nvl "Her first complete sentence of the morning was a systems inventory. Her second was an apology for the words she had dropped in the night. Nobody had asked for either."
 
-    ## F3 wave (chaos): the mug beat hard-coded "outside the generator room"
+    ## The mug beat hard-coded "outside the generator room"
     ## for a run that never set foot there. Stage it where she actually was.
     if marcus_relationship >= 3 and generator_repaired:
         narrator_nvl "The station relaxed by degrees. Elara and Marcus did not — not entirely. But when he found her outside the generator room, he handed her a mug before asking for the damage report. She took it."
@@ -8418,7 +8404,7 @@ label act3_start:
 
     call terminal_elara("If I help Marcus find a safer way to expose the trust protocol... we risk everything on the chance that we can fix a system designed not to be fixed.")
 
-    ## Aurora path requires a LIVE line to the future (Sol review, round 2 #1):
+    ## Aurora path requires a LIVE line to the future:
     ## a spent contact (signals recovery) falls to the no-Aurora else, which
     ## now serves both blocked and spent — so a signals-recovery-success player
     ## still reaches the Report/Together/Silence decision.
@@ -8486,7 +8472,7 @@ label act3_start:
         call terminal_signal("I REMEMBER ALL OF IT. BECAUSE I LIVED ALL OF IT.")
 
         ## The "I AM YOU" reveal \u2014 the ONLY place ECHO-7's identity is known
-        ## (Sol round-4). Distinct from knows_aurora_option, which can be the
+        ## Distinct from knows_aurora_option, which can be the
         ## NAME learned in Act 2 without ever meeting the speaker's identity.
         $ echo7_identity_known = True
         $ evidence_log = evidence_log + ["ECHO-7 identity claim \u2014 says it is a neural imprint of future Elara Voss, seven years post-cascade; unverified"]
@@ -8611,7 +8597,7 @@ label act3_start:
 
     else:
         ## No signal contact path — but now "Together" is reachable from more states
-        ## Sol round-2 #1: this branch now serves BOTH blocked and spent, so a
+        ## This branch now serves BOTH blocked and spent, so a
         ## signals-recovery-success player reaches the decision instead of a
         ## dead end at the bottom of act3_start.
         if echo7_contact_spent:
@@ -8669,7 +8655,7 @@ label act3_interlude:
         else:
             narrator_adv "Without the terminal's fan, she can hear the pumps and the shutters easing in their frames. The station has gone on working while she stood still."
 
-        ## F4 wave (user, 2026-08-19): the 20% recovery is a floor, not a
+        ## 2026-08-19: the 20% recovery is a floor, not a
         ## heal — later scenes carry it as an offhand fact, not a crisis.
         if aria_recovered_from_collapse:
             ## Recovery is graded by distance from the storm (user design):
@@ -9038,7 +9024,7 @@ label ending_aurora:
 
     nvl clear
 
-    ## F3 wave (chaos): a full-disclosure run — Marcus handed the sender's
+    ## A full-disclosure run — Marcus handed the sender's
     ## identity in the lab — still got "never told anyone", while Marcus's
     ## own epilogue behavior reflected knowing. Honor the disclosure.
     if source_stance == "empathetic" and marcus_knows_sender:
@@ -9148,7 +9134,7 @@ label ending_patch:
 
     narrator_nvl "The patch propagated. CONVERGENCE became harmless \u2014 a key that no longer fit any lock."
 
-    ## R5-3: after the storm confrontation he knows she found the file \u2014 on
+    ## After the storm confrontation he knows she found the file \u2014 on
     ## some routes she quoted the vulnerable line to his face. When the exploit
     ## dies there is exactly one suspect, and he cannot name her without
     ## confessing what the exploit was for.
@@ -9365,7 +9351,7 @@ label ending_report:
     nvl clear
 
     ## ECHO-7 timeline note. Spent-contact (signals recovery) is a third state
-    ## (Sol round-3): she knows exactly why the voice is gone \u2014 she spent it.
+    ## She knows exactly why the voice is gone \u2014 she spent it.
     if echo7_contact_spent:
         narrator_nvl "ECHO-7 never returned, and Elara knew precisely why. She had spent the last of that voice forcing a locked door \u2014 traded the warning for the proof. Whether the future changed, the one source that could have told her was gone, and she had been the one to burn it out."
         nvl clear
@@ -9415,7 +9401,7 @@ label ending_together:
     ## The tell (2026-08-15, marcus_knows_sender). She decided at the interlude
     ## that he gets the whole of it, and this is the first room she is in with
     ## him afterwards — so it goes first, before the agenda. Placed ABOVE the
-    ## R5-1 opener so the existing exchange (her line, his angry answer to it)
+    ## opener so the existing exchange (her line, his angry answer to it)
     ## stays adjacent and byte-identical on the flag-false arm.
     if marcus_knows_sender:
         elara "Before we start — the sender. You should know who it is."
@@ -9437,7 +9423,7 @@ label ending_together:
 
         elara "It's the one I can give you."
 
-    ## R5-1: this scene follows the storm confrontation \u2014 he has known for days
+    ## This scene follows the storm confrontation \u2014 he has known for days
     ## that she found CONVERGENCE. She is not breaking news; she is reopening a
     ## conversation they both walked away from.
     elara "Marcus. The storm conversation. We never finished it."
@@ -9506,7 +9492,7 @@ label ending_together:
 
     narrator_nvl "They called it Aurora."
 
-    ## Sol round-4: three states, name vs identity. She only calls it "a
+    ## Three states, name vs identity. She only calls it "a
     ## version of herself" if the Act-3 "I AM YOU" reveal happened
     ## (echo7_identity_known). She can know the NAME from Act 2 without ever
     ## learning who the voice was (knows_aurora_option). Otherwise: their own.
@@ -9583,7 +9569,7 @@ label ending_silence:
 
     elara_thought "I can\u2019t hand him to a tribunal. Twenty years of Marcus \u2014 the plants he waters, the grant panic, the terrible tea \u2014 against one encrypted file. It isn\u2019t a fair fight, and I won\u2019t pretend it is."
 
-    ## R5-2: she already confronted him during the storm \u2014 he knows she went
+    ## She already confronted him during the storm \u2014 he knows she went
     ## looking, and he will know exactly who deleted the file. The deletion is
     ## not a concealment. It is a message, and both of them will be able to
     ## read it.
@@ -9612,7 +9598,7 @@ label ending_silence:
         $ _archive_word = "archive" if evidence_archived == 1 else "archives"
         narrator_nvl "The sealed drives from the storm sat in Elara\u2019s desk drawer for a year \u2014 [evidence_archived] [_archive_word] of proof, hashes intact, protecting no one."
 
-    ## Sol round-3: Silence is only reachable from the no-Aurora menu (blocked
+    ## Silence is only reachable from the no-Aurora menu (blocked
     ## OR spent). "Once blocked" is false for the spent-contact route.
     if echo7_contact_spent:
         ## No burst on the spent arm — ECHO-7 emptied its budget forcing the
@@ -9682,7 +9668,7 @@ label act3_nofile_climax:
 
     if marcus_locked_partition:
         if recovery_attempted:
-            ## Sweep F4: after a failed recovery she stood beside the attempt —
+            ## After a failed recovery she stood beside the attempt —
             ## this is a verdict, not news. Never re-report the seal as a
             ## discovery to the person who helped force it.
             aria_nvl "You know most of it already. You were with me when we set everything we had against Dr. Chen’s seal, and the seal held."
@@ -9788,7 +9774,7 @@ label act3_nofile_climax:
         elara_thought "No file. A partial index, a frightened machine, and a search I paused because Marcus was beginning to look back. Twenty years of him on the other side of it."
     else:
         elara_thought "No file. An unfinished index, a frightened machine, and twenty years of Marcus behind the partition it searched."
-    ## Review2 (2026-08-16): "supposed to have proof" presumes she has a
+    ## 2026-08-16: "supposed to have proof" presumes she has a
     ## charge in mind — true when the cascade or the named partition file
     ## gave her one. On routes with neither (blocked-sealed-alone), she is
     ## not building a case, and the thought says so.
@@ -9811,7 +9797,7 @@ label act3_nofile_climax:
     ## "complete and unread"). She cannot cite a report she never read, so the
     ## gate excludes it. Single line for the route flattener.
     if origin_sweep_done and not origin_sweep_unseen:
-        elara_thought "Almost none. Forty-five clean minutes on bearing 287.4, and no transmitter the dome could locate. The measurement is real. It does not tell me where the sender is, or why I should trust the voice. That part I am about to take on faith."
+        elara_thought "One finished measurement. Forty-five clean minutes on bearing 287.4, and no transmitter the dome could locate. The measurement is real. It does not tell me where the sender is, or why I should trust the voice. That part I am about to take on faith."
 
     nvl hide echo_mode_dissolve
     nvl clear
@@ -9884,7 +9870,7 @@ label act3_nofile_withdraws:
     marcus "It’s fine, Elara. Whatever it is, it can keep."
 
     if recovery_left_trace:
-        ## His seal logged the failed force attempt (sweep F5). He names it —
+        ## His seal logged the failed force attempt. He names it —
         ## measured, not gloating — and that is the whole conversation he wants.
         marcus "One thing, though. The seal on my partition keeps its own log. Someone put their weight against it tonight, and it held."
         marcus "I’m not asking. I’m telling you I know."
@@ -9899,7 +9885,7 @@ label act3_nofile_withdraws:
     menu:
         "The corridor is very quiet."
 
-        ## Sweep F9: with no name in hand she cannot claim "the file" — ARIA
+        ## With no name in hand she cannot claim "the file" — ARIA
         ## only gave her the shape of something behind the seal.
         "“Marcus, sit down. I know about the file.”" if knows_convergence_file:
             $ _confront_initiator = "elara"
@@ -9978,7 +9964,7 @@ label act3_nofile_marcus_initiates:
         marcus "I don’t even know how much of this is you. That’s the part I can’t put down. I look at you and I can’t tell if you’re in it, or just standing next to it."
         elara "Marcus—"
 
-    ## "it was sent", not "you sent it" (sweep F8): in the unaware branch he
+    ## "it was sent", not "you sent it": in the unaware branch he
     ## just said he cannot tell whether she is in it — he cannot then assert
     ## she dispatched the sweep. Neutral phrasing serves both branches.
     marcus "So ask me. Whatever it was sent looking for — ask me. Don’t ask ARIA."
@@ -10459,7 +10445,7 @@ label ending_nofile_together:
 
     call terminal_elara("Personal log. Marcus confessed. Not to a tribunal, not to ARIA — to me. Because I asked him instead of a machine.")
 
-    ## Sweep F1: on no-name routes (blocked before ECHO-7 named it, scan never
+    ## On no-name routes (blocked before ECHO-7 named it, scan never
     ## finished) his confession never says the filename either — she cannot
     ## log a name nobody ever gave her.
     if knows_convergence_file:
@@ -10475,7 +10461,7 @@ label ending_nofile_together:
 
     call terminal_elara("No. He opened it. That’s different. That’s the whole thing, actually.")
 
-    ## Live-run item (finalrun debrief): at collapse-adjacent integrity the
+    ## Live-run item: at collapse-adjacent integrity the
     ## grace note must carry the night's cost — the warm thank-you with no
     ## acknowledgment read as the game not tracking the neglect. Mirrors the
     ## approved On-Faith counted-cost gate (<= 45).
@@ -10583,10 +10569,10 @@ label ending_nofile_act:
         else:
             elara_thought_adv "ARIA chose to search without my authorization. She told me why: she was afraid of what the pattern might mean for her."
             elara_thought_adv "That choice matters. It does not make her fear proof of the future, or tell me what Marcus intends."
-        ## Live-run item (coldrun debrief): the ending must not cite a
+        ## Live-run item: the ending must not cite a
         ## neglected ARIA as free vindication — when she was left to burn,
         ## the log counts the cost of the second mind it is leaning on.
-        ## Sol review 2, #5: "never paid a watt" only when it is literally
+        ## "Never paid a watt" only when it is literally
         ## true (aria_ever_powered tracks the history); a player who powered
         ## her for part of the night gets the honest partial-debt variant.
         if aria_integrity <= 45:
@@ -10635,7 +10621,7 @@ label ending_nofile_act:
     else:
         narrator_nvl "CONVERGENCE has not deployed. Whether that is her doing, or Marcus’s own second thoughts, or a fork in a road no one can see the whole of, she will never know. The not-knowing is the price of being early."
 
-    ## F3 wave (ariafirst): the ON FAITH epilogue dropped ARIA entirely —
+    ## The ON FAITH epilogue dropped ARIA entirely —
     ## her kill-signal vulnerability named all night, then a year passes
     ## with no word whether she survived it. "The one place the writing
     ## broke faith with its own mechanics." One beat, keyed to how the
@@ -10743,7 +10729,7 @@ label ending_nofile_alone:
             call terminal_elara("The question survived the scan. So did the boundary, and the friend on its other side. I came out of the night with less certainty than I wanted and more than I could use.")
     else:
         call terminal_elara("Personal log. I blocked the signal a week ago. I spent the storm looking anyway — every partition I could reach, every log, every favor I could call in.")
-        ## Sol #1: on the blocked route ARIA may never have named the file, so
+        ## On the blocked route ARIA may never have named the file, so
         ## do not claim "a name I can't open" when she has no name.
         if knows_convergence_file:
             call terminal_elara("It closed against me. A sealed door, or a machine that ran out of night. Either way I came up with a name I can’t open and a friend I can’t accuse.")
@@ -10751,7 +10737,7 @@ label ending_nofile_alone:
             call terminal_elara("It closed against me. A sealed door, or a machine that ran out of night. Either way I came up empty — a locked door, a friend I can’t accuse, and not even a name for what’s behind it.")
 
     if _drifted and recovery_attempted:
-        ## Sweep F2: she DID look — she threw the night at the seal. The drift
+        ## She DID look — she threw the night at the seal. The drift
         ## was Marcus. "I did not even look" would be flatly false here.
         elara_thought_adv "I looked at everything except him. I threw the night at a locked door, and when it held, I could not make myself knock on the one he was standing behind."
     elif _drifted:
@@ -10779,9 +10765,9 @@ label ending_nofile_alone:
 
     narrator_nvl "On the morning of March 15, 2048, every screen in the observatory went dark. ARIA got half a sentence out before the dark took her: UPLINK LOST. RECONN—"
 
-    ## Knowledge-state branch (Sol/user review): blocking AFTER hearing the
+    ## Knowledge-state branch: blocking AFTER hearing the
     ## cascade foretold is a different regret from blocking on a hunch before
-    ## the probe ever named it. Sweep F3: the contact HISTORY branches too —
+    ## the probe ever named it. The contact HISTORY branches too —
     ## "cut off in the first week" was only ever true on the blocked route;
     ## spent burned the line tonight, and open-drift never lost it at all.
     if knows_cascade:
@@ -10830,8 +10816,8 @@ label ending_nofile_alone:
     $ ending_seen = "nofile_alone"
 
     narrator_nvl "{size=+5}ENDING: THE SEALED DOOR{/size}"
-    ## Sol #3: the drift route did not investigate — the caption must match.
-    ## Sweep F2: unless she DID investigate (a recovery attempt) before
+    ## The drift route did not investigate — the caption must match.
+    ## Unless she DID investigate (a recovery attempt) before
     ## drifting on the conversation itself.
     if _drifted and recovery_attempted:
         narrator_nvl "She forced a door, and could not force a conversation."
